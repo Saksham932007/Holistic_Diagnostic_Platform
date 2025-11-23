@@ -24,6 +24,7 @@ from monai.transforms import Compose, Transform
 from ..config import get_config
 from ..utils import AuditEventType, AuditSeverity, log_audit_event
 from .deid import DICOMDeidentifier
+from .validation import DICOMValidator, DICOMValidationError
 
 
 class MedicalImageDataset(Dataset):
@@ -164,7 +165,7 @@ class MedicalImageDataset(Dataset):
     
     def _validate_medical_image(self, image_path: Path) -> None:
         """
-        Validate a medical image file.
+        Validate a medical image file using comprehensive validation.
         
         Args:
             image_path: Path to the medical image file
@@ -176,7 +177,18 @@ class MedicalImageDataset(Dataset):
         
         try:
             if file_extension in ['.dcm', '.dicom']:
-                self._validate_dicom(image_path)
+                # Use comprehensive DICOM validator
+                validator = DICOMValidator(strict_mode=self._config.compliance.enable_audit_logging)
+                validation_result = validator.validate_dicom_file(
+                    image_path, 
+                    session_id=self._session_id,
+                    user_id=self._user_id
+                )
+                
+                if not validation_result['is_valid']:
+                    error_summary = "; ".join(validation_result['errors'])
+                    raise DICOMValidationError(f"DICOM validation failed: {error_summary}")
+                
             elif file_extension in ['.nii', '.nii.gz']:
                 self._validate_nifti(image_path)
             else:
@@ -189,7 +201,7 @@ class MedicalImageDataset(Dataset):
     
     def _validate_dicom(self, dicom_path: Path) -> None:
         """
-        Validate a DICOM file.
+        Validate a DICOM file using comprehensive validation.
         
         Args:
             dicom_path: Path to DICOM file
@@ -197,34 +209,28 @@ class MedicalImageDataset(Dataset):
         Raises:
             ValueError: If DICOM is invalid
         """
-        try:
-            dataset = pydicom.dcmread(str(dicom_path))
-            
-            # Check required DICOM tags
-            required_tags = self._config.data.required_tags
-            missing_tags = []
-            
-            for tag_name in required_tags:
-                if not hasattr(dataset, tag_name):
-                    missing_tags.append(tag_name)
-            
-            if missing_tags:
-                raise ValueError(f"Missing required DICOM tags: {missing_tags}")
-            
-            # Validate modality if specified
-            if (hasattr(dataset, 'Modality') and 
-                dataset.Modality not in self._config.data.allowed_modalities):
-                raise ValueError(f"Unsupported modality: {dataset.Modality}")
-            
-            # Validate slice thickness if present
-            if hasattr(dataset, 'SliceThickness'):
-                thickness = float(dataset.SliceThickness)
-                if (thickness < self._config.data.min_slice_thickness or
-                    thickness > self._config.data.max_slice_thickness):
-                    raise ValueError(f"Invalid slice thickness: {thickness}mm")
-            
-        except InvalidDicomError as e:
-            raise ValueError(f"Invalid DICOM format: {str(e)}")
+        validator = DICOMValidator(strict_mode=self._config.compliance.enable_audit_logging)
+        validation_result = validator.validate_dicom_file(
+            dicom_path,
+            session_id=self._session_id,
+            user_id=self._user_id
+        )
+        
+        if not validation_result['is_valid']:
+            error_summary = "; ".join(validation_result['errors'])
+            raise DICOMValidationError(f"DICOM validation failed: {error_summary}")
+        
+        # Log warnings if any
+        if validation_result['warnings']:
+            warning_summary = "; ".join(validation_result['warnings'])
+            log_audit_event(
+                event_type=AuditEventType.IMAGE_PROCESSING,
+                severity=AuditSeverity.WARNING,
+                message=f"DICOM validation warnings: {warning_summary}",
+                user_id=self._user_id,
+                session_id=self._session_id,
+                additional_data={'file_path': str(dicom_path)}
+            )
     
     def _validate_nifti(self, nifti_path: Path) -> None:
         """
