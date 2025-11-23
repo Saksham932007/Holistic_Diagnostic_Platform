@@ -1,0 +1,129 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: medical-platform
+  labels:
+    name: medical-platform
+    purpose: medical-image-analysis
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: medical-platform-config
+  namespace: medical-platform
+data:
+  # Application configuration
+  LOG_LEVEL: "INFO"
+  WORKERS: "4"
+  MAX_WORKERS: "8"
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  
+  # Database configuration
+  DATABASE_URL: "postgresql://medical_user:medical_pass@postgres:5432/medical_platform"
+  REDIS_URL: "redis://redis:6379"
+  
+  # Security configuration
+  ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  
+  # Model configuration
+  MODEL_CACHE_SIZE: "2048"
+  BATCH_SIZE: "4"
+  MAX_IMAGE_SIZE: "512"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: medical-platform-secrets
+  namespace: medical-platform
+type: Opaque
+data:
+  # Base64 encoded secrets (use: echo -n "secret" | base64)
+  JWT_SECRET_KEY: bWVkaWNhbC1qd3Qtc2VjcmV0LWtleS0yMDI1  # medical-jwt-secret-key-2025
+  POSTGRES_PASSWORD: bWVkaWNhbF9wYXNzd29yZA==  # medical_password
+  GRAFANA_PASSWORD: Z3JhZmFuYV9hZG1pbl8yMDI1  # grafana_admin_2025
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: medical-data-pv
+  labels:
+    type: local
+spec:
+  storageClassName: local-storage
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /data/medical-platform/data
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: medical-models-pv
+  labels:
+    type: local
+spec:
+  storageClassName: local-storage
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /data/medical-platform/models
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: medical-data-pvc
+  namespace: medical-platform
+spec:
+  storageClassName: local-storage
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: medical-models-pvc
+  namespace: medical-platform
+spec:
+  storageClassName: local-storage
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: medical-platform
+spec:
+  storageClassName: local-storage
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: medical-platform
+spec:
+  storageClassName: local-storage
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
