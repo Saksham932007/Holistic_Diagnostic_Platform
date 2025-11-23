@@ -71,8 +71,9 @@ Thumbs.db
 logs/
 *.log
 
-# Model artifacts
-models/
+# Model artifacts (saved models, not source code)
+saved_models/
+model_artifacts/
 checkpoints/
 runs/
 outputs/
