@@ -15,6 +15,16 @@ from .validation import (
     DICOMValidationError,
 )
 
+from .transforms import (
+    get_training_transforms,
+    get_validation_transforms,
+    get_inference_transforms,
+    MedicalNormalizationTransform,
+    AnatomicallyAwareRotation,
+    MedicalElasticDeformation,
+    IntensityAugmentation
+)
+
 __all__ = [
     "MedicalImageDataset",
     "MultimodalMedicalDataset", 
@@ -24,4 +34,11 @@ __all__ = [
     "DICOMDeidentifier",
     "DICOMValidator",
     "DICOMValidationError",
+    "get_training_transforms",
+    "get_validation_transforms", 
+    "get_inference_transforms",
+    "MedicalNormalizationTransform",
+    "AnatomicallyAwareRotation",
+    "MedicalElasticDeformation",
+    "IntensityAugmentation"
 ]
